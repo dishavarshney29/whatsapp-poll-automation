@@ -71,7 +71,7 @@ jobs:
       
     - name: Restore WhatsApp session
       id: restore-session
-      uses: actions/cache/restore@v3
+      uses: actions/cache/restore@v4
       with:
         path: |
           .wwebjs_auth/
@@ -113,7 +113,7 @@ jobs:
         
     - name: Save WhatsApp session
       if: always()
-      uses: actions/cache/save@v3
+      uses: actions/cache/save@v4
       with:
         path: |
           .wwebjs_auth/
@@ -122,7 +122,7 @@ jobs:
         
     - name: Upload logs on failure
       if: failure()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: error-logs-${{ github.run_number }}
         path: |
