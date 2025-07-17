@@ -1,0 +1,33 @@
+{
+  "name": "whatsapp-poll-automation",
+  "version": "1.0.0",
+  "description": "Automated WhatsApp group poll sender using GitHub Actions",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dinner": "node bot.js dinner",
+    "breakfast": "node bot.js breakfast",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "automation",
+    "polls",
+    "github-actions",
+    "scheduling"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "whatsapp-web.js": "^1.23.0",
+    "qrcode-terminal": "^0.12.0",
+    "puppeteer": "^21.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/whatsapp-poll-automation"
+  }
+}
