@@ -1,0 +1,138 @@
+name: WhatsApp Poll Automation
+
+on:
+  schedule:
+    # Dinner poll: Monday to Saturday at 3:00 PM IST (9:30 AM UTC)
+    - cron: '30 9 * * 1-6'
+    # Breakfast poll: Monday to Friday + Sunday at 9:00 PM IST (3:30 PM UTC)
+    - cron: '30 15 * * 1-5,0'
+  
+  workflow_dispatch:
+    inputs:
+      poll_type:
+        description: 'Type of poll to send'
+        required: true
+        default: 'dinner'
+        type: choice
+        options:
+          - dinner
+          - breakfast
+
+env:
+  NODE_VERSION: '18'
+  PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
+  PUPPETEER_EXECUTABLE_PATH: '/usr/bin/google-chrome-stable'
+
+jobs:
+  send-poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          wget \
+          gnupg \
+          ca-certificates \
+          fonts-liberation \
+          libappindicator3-1 \
+          libasound2 \
+          libatk-bridge2.0-0 \
+          libdrm2 \
+          libgtk-3-0 \
+          libnspr4 \
+          libnss3 \
+          libxss1 \
+          libxtst6 \
+          xdg-utils
+        
+        # Install Google Chrome
+        wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        
+    - name: Install Node.js dependencies
+      run: npm install
+      
+    - name: Create auth directory
+      run: mkdir -p .wwebjs_auth
+      
+    - name: Restore WhatsApp session
+      id: restore-session
+      uses: actions/cache/restore@v3
+      with:
+        path: |
+          .wwebjs_auth/
+          session.json
+        key: whatsapp-session-${{ runner.os }}
+        
+    - name: Determine poll type
+      id: poll-type
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "POLL_TYPE=${{ github.event.inputs.poll_type }}" >> $GITHUB_OUTPUT
+        else
+          # Check time to determine poll type
+          CURRENT_HOUR=$(date -u +%H)
+          CURRENT_MIN=$(date -u +%M)
+          CURRENT_TIME=$(($CURRENT_HOUR * 60 + $CURRENT_MIN))
+          
+          # 9:30 AM UTC = 3:00 PM IST (dinner time)
+          DINNER_TIME=$((9 * 60 + 30))
+          # 3:30 PM UTC = 9:00 PM IST (breakfast time)
+          BREAKFAST_TIME=$((15 * 60 + 30))
+          
+          if [ $CURRENT_TIME -ge $DINNER_TIME ] && [ $CURRENT_TIME -lt $((DINNER_TIME + 30)) ]; then
+            echo "POLL_TYPE=dinner" >> $GITHUB_OUTPUT
+          elif [ $CURRENT_TIME -ge $BREAKFAST_TIME ] && [ $CURRENT_TIME -lt $((BREAKFAST_TIME + 30)) ]; then
+            echo "POLL_TYPE=breakfast" >> $GITHUB_OUTPUT
+          else
+            echo "POLL_TYPE=dinner" >> $GITHUB_OUTPUT
+          fi
+        fi
+        
+    - name: Send WhatsApp Poll
+      id: send-poll
+      run: |
+        echo "Sending ${{ steps.poll-type.outputs.POLL_TYPE }} poll..."
+        timeout 300 node bot.js ${{ steps.poll-type.outputs.POLL_TYPE }} || exit 1
+      env:
+        GITHUB_ACTIONS: true
+        
+    - name: Save WhatsApp session
+      if: always()
+      uses: actions/cache/save@v3
+      with:
+        path: |
+          .wwebjs_auth/
+          session.json
+        key: whatsapp-session-${{ runner.os }}
+        
+    - name: Upload logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: error-logs-${{ github.run_number }}
+        path: |
+          *.log
+          session.json
+        retention-days: 7
+        
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "❌ WhatsApp poll automation failed!"
+        echo "Check the logs for more details."
+        echo "You may need to re-authenticate WhatsApp Web."
